@@ -21,7 +21,9 @@
                               ~~                      \:|   |                  \::/    /        
                                                        \|___|                   \/____/         
 ```
-## TORN or Task Orchestration Engine is a... well, a task orchestration engine. 
+## TORN(Task ORchestration eNgine)
+TORN is a... well, a task orchestration engine, that let's you add jobs to a queue and executes them for you.
+ 
 You can use the workers to queue jobs into a redis set and the workers will recursively process them.<br> 
 *TORN will be pakaged as an SDK and will be deployed to use with npm in the future*<br><br>
 TORN MVP as of 14-06-2025 includes
