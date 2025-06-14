@@ -1,3 +1,7 @@
+/*
+    NOTE: I PUT THOSE EMOJIS IN THE LOGGERS BECAUSE I LIKE THEM AND THEY MAKE THE LOGS LOOK COOL
+*/
+
 import { buildServer } from "./server";
 import dotenv from "dotenv";
 
