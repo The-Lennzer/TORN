@@ -4,13 +4,16 @@ import ExecutorFactory from "../executors/executor.factory";
 import {
     JOB_QUEUE,
     jobMetaKey,
-    jobDataKey
+    jobDataKey,
+    MAX_RETRIES,
+    BASE_BACKOFF_MS,
+    DEAD_LETTER_QUEUE
 } from "../lib/constants";
 
 class Worker{
     async processJob(): Promise<void> {
         try{
-            const jobIdRequest = await redis.brpop('job:default', 5);
+            const jobIdRequest = await redis.brpop(JOB_QUEUE, 5);
 
             if (!jobIdRequest) {
                 console.log('📛 Queue might be empty or unknown error!');
@@ -50,7 +53,7 @@ class Worker{
                 output = jobResults.output;
                 error = jobResults.error;
 
-                logger.info(`✅ Job completed: ${jobId}`);
+                logger.info(`✅ Job execution completed: ${jobId}`);
                 logger.info({
                     success,
                     output,
@@ -58,23 +61,51 @@ class Worker{
                 })
             } catch (err) {
                 logger.error(`❌ Job execution failed for job ${jobId}:`, err);
-                jobMeta.retries = (parseInt(jobMeta.retries || '0') + 1).toString();
             }
-
+            
+            //get the status of the job
             jobMeta.status = success ? 'completed' : 'failed';
+            
+            //if the job has successfully completed, we're happy and we perform happy updates
             if(jobMeta.status === 'completed'){
                 jobMeta.completedAt = Date.now().toString();
-            }
-            else{
+            //     await redis.hset(jobMetaKey(jobId), {
+            //     ...jobMeta,
+            //     success: String(success),
+            //     output: output || '',
+            //     error: error || '',
+            // });
+            } else {
+                //this is where the job fked up
+                //set a retry count since the job obviously failed the first time,  so we give it a second chance(3 chances actually)
                 jobMeta.retries = (parseInt(jobMeta.retries || '0') + 1).toString();
+                //since we give it retries, we need to check if the max retries has been reached
+                if (parseInt(jobMeta.retries) > MAX_RETRIES){
+                    logger.info(`❌ Job failed after ${MAX_RETRIES} retries: ${jobId}`);
+                    jobMeta.status = 'failed';
+                    jobMeta.completedAt = Date.now().toString();
+                    //ooh groovy stuff, we push jobs that have failed max retries times to the dead letter queue
+                    await redis.lpush(DEAD_LETTER_QUEUE, jobId); 
+                } else {
+                    //in the event where the retries have not exceeded max retries, we push it into the queue again for execution
+                    jobMeta.status = 'pending';
+                    const backoff = BASE_BACKOFF_MS * Math.pow(2, parseInt(jobMeta.retries || '0'));
+                    jobMeta.nextRetryAt = (Date.now() + backoff).toString();
+                    logger.info(`⏰ Job: ${jobId} has failed. Retrying in ${backoff}ms `);
+                    //but this time we push it back into the queue with a backoff so that it waits a period of time before being retried
+                    setTimeout(() => {
+                        redis.lpush(JOB_QUEUE, jobId);
+                    }, backoff);
+                }
             }
 
+            //finally we update the job metadata
             await redis.hset(jobMetaKey(jobId), {
                 ...jobMeta,
                 success: String(success),
                 output: output || '',
                 error: error || '',
-            });
+            })  
 
             logger.info(`✅ Job ${success ? 'completed' : 'failed'}: ${jobId}`);
             logger.debug({ success, output, error });
@@ -82,14 +113,11 @@ class Worker{
         } catch (err: any) {
             logger.error(`❌ Job processing failed: ${err.message}`);
         }
-
-        //hehe recursive function call to keep processing jobs based on brpop blocking call
-        this.processJob();
     } 
 
     //this will start the worker duh!
-    startWorker() {
+    async startWorker() {
         logger.info("🚀 Worker started and waiting for jobs...");
-        this.processJob();
+        while(true){ await this.processJob(); }
     }
 }

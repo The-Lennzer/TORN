@@ -21,6 +21,7 @@ async function enqueueJobHandler(req: FastifyRequest, res: FastifyReply) {
         createdAt: Date.now().toString(),
         startedAt: null,
         completedAt: null,
+        nextRetryAt: null
     })
     
     //add the payload data
