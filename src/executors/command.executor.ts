@@ -6,6 +6,7 @@ import { clear } from "console";
 class CommandExecutor {
     async execute(job: CommandJobInterface): Promise<{ success: boolean; output?: string; error?: string }>{
         return new Promise((resolve) => {
+            try{
             //extract job fields
             const {type, command, args, timeout} = job;
 
@@ -18,18 +19,21 @@ class CommandExecutor {
                 });
             }
             
-            const timeoutMs = timeout || 10000;
-            logger.info(`🛠️  Executing command: ${job.command} ${args.join(" ")}`);
+            const timeoutMs = Number(timeout) || 10000;
+            logger.info(`Executing command: ${job.command} ${args.join(" ")}`);
 
             //spawn create a child process - I think like a fork(): here used to run a shell commmand
-            const child = spawn(command, args, { timeout: timeoutMs });
+            const child = spawn(command, args, { 
+                timeout: timeoutMs,
+                shell: true
+             });
 
             let stdout = '';
             let stderr = '';
 
             //after timeoutMs, the child process gets killed and error is thrown
             const commandTimeout = setTimeout(() => {
-                logger.error(`⏰ Job timed out after ${timeoutMs}ms`);
+                logger.error(`Job timed out after ${timeoutMs}ms`);
                 child.kill("SIGTERM");
                 resolve({ success: false, error: "Execution timed out" });
             }, timeoutMs);
@@ -44,24 +48,31 @@ class CommandExecutor {
                 stderr += data;
             });
 
+            if (stderr) logger.error(`Stderr: ${stderr}`);
+
             //handling child process finish
             child.on('close', (code) => {
                 clearTimeout(commandTimeout);
 
                 if(code === 0){
-                    logger.info(`✅ Command executed successfully`);
+                    logger.info(`Command executed successfully`);
                     resolve({ success: true, output: stdout });
                 } else {
-                    logger.error(`❌ Command execution failed with code: ${code}`);
+                    logger.error(`Command execution failed with code: ${code}`);
                     resolve({ success: false, error: stderr.trim() || 'Unknown error!' });
                 }
             })
 
             //handling error starting child process
             child.on('error', (err) => {
-                logger.error(`❌ Failed to start command: ${err.message}`);
+                logger.error(`Failed to start command: ${err.message}`);
+                if (stderr) logger.error(`Stderr: ${stderr}`);
                 resolve({ success: false, error: err.message });
             })
+        }catch (err: any) {
+            logger.error(`Unexpected error in Command Executor: ${err.message}`);
+            resolve({ success: false, error: err.message });
+        }
 
         })
     }
