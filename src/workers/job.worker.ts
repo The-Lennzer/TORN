@@ -9,6 +9,7 @@ import {
     BASE_BACKOFF_MS,
     DEAD_LETTER_QUEUE
 } from "../lib/constants";
+ import RetryManager from "../retry/retry.manager";
 
 class Worker{
     async processJob(): Promise<void> {
@@ -20,7 +21,8 @@ class Worker{
                 return;
             }
 
-            const jobId = jobIdRequest[1];                              //identifies the job
+            const jobId = jobIdRequest[1];    
+            console.log("THE JOBID YOU're PROCESSING:", jobId)                          //identifies the job
             const jobMeta = await redis.hgetall(jobMetaKey(jobId));     //gets the job metadata(status, timestamps etc)
             const job = await redis.hgetall(jobDataKey(jobId));         //the payload
 
@@ -72,25 +74,27 @@ class Worker{
             if(jobMeta.status === 'completed'){
                 jobMeta.completedAt = Date.now().toString();
             } else {
-                jobMeta.retries = (parseInt(jobMeta.retries || '0') + 1).toString();
-                
-                if (parseInt(jobMeta.retries) > MAX_RETRIES){
-                    logger.info(`Job failed after ${MAX_RETRIES} retries: ${jobId}`); //job has finished all retries and is moved to DLQ
+                const retry = parseInt(jobMeta.retries || '0') + 1
+                jobMeta.retries = retry.toString();
+                const retryManager = new RetryManager();
+
+                if (retry > MAX_RETRIES){
+                    logger.info(`Job failed after ${retry} retries: ${jobId}`); //job has finished all retries and is moved to DLQ
                     jobMeta.status = 'failed';
                     jobMeta.completedAt = Date.now().toString();
-                    
+                    retryManager.removeRetries(jobId);
                     await redis.lpush(DEAD_LETTER_QUEUE, jobId); 
                 } else {
-                   
+                
                     jobMeta.status = 'pending';
-                    const backoff = BASE_BACKOFF_MS * Math.pow(2, parseInt(jobMeta.retries || '0'));
-                    jobMeta.nextRetryAt = (Date.now() + backoff).toString();
+                    const backoff = BASE_BACKOFF_MS * Math.pow(2, retry);
+                    const nextRetryAt = await retryManager.markNextRetry(jobId, backoff);
+
+                    jobMeta.nextRetryAt = nextRetryAt.toString();
                     logger.info(`Job: ${jobId} has failed. Retrying in ${backoff}ms `);
-                    
                 }
             }
 
-            //finally we update the job metadata
             await redis.hset(jobMetaKey(jobId), {
                 ...jobMeta,
                 success: String(success),

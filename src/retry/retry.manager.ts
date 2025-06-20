@@ -14,7 +14,8 @@ class RetryManager {
     }
 
     async getDueRetries(now: number): Promise<string[]>{
-        return await redis.zrangebyscore(RETRY_QUEUE, 0, now);
+        const jobs = await redis.zrangebyscore(RETRY_QUEUE, 0, now);
+        return jobs;
     }
 
     async removeRetries(jobId: string): Promise<void>{
@@ -22,10 +23,13 @@ class RetryManager {
     }
 
     async requeueRetries(jobId: string): Promise<void> {
+        const multi = redis.multi();
+        await redis.zrem(RETRY_QUEUE, jobId);
         await redis.lpush(JOB_QUEUE, jobId);
+        await multi.exec();
     }
 
-    async markNextRetry(delayMs: number, jobId: string): Promise<number>{
+    async markNextRetry(jobId: string, delayMs: number): Promise<number>{
         const nextRetryAt = Date.now() + delayMs;
         await this.scheduler(jobId, nextRetryAt);
         return nextRetryAt;
