@@ -2,7 +2,7 @@ import RetryManager from "./retry.manager";
 import logger from "../utils/logger";
 import redis from "../queue/redis";
 
-const retryManager = new RetryManager();
+const retryManager = new RetryManager(redis);
 
 const startRetryProcessor = async (retryIntervalMs:number = 5000) => {
     logger.info("Retries have begun!");

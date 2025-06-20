@@ -9,24 +9,25 @@ import {
 // requeue
 // setter
 class RetryManager {
+    constructor(private redisClient: any){}
     async scheduler(jobId: string, retryAt: number): Promise<void>{
-        await redis.zadd(RETRY_QUEUE, retryAt, jobId);
+        await this.redisClient.zadd(RETRY_QUEUE, retryAt, jobId);
     }
 
     async getDueRetries(now: number): Promise<string[]>{
-        const jobs = await redis.zrangebyscore(RETRY_QUEUE, 0, now);
+        const jobs = await this.redisClient.zrangebyscore(RETRY_QUEUE, 0, now);
         return jobs;
     }
 
     async removeRetries(jobId: string): Promise<void>{
-        await redis.zrem(RETRY_QUEUE, jobId);
+        await this.redisClient.zrem(RETRY_QUEUE, jobId);
     }
 
     async requeueRetries(jobId: string): Promise<void> {
-        const multi = redis.multi();
-        await redis.zrem(RETRY_QUEUE, jobId);
-        await redis.lpush(JOB_QUEUE, jobId);
-        await multi.exec();
+        // const multi = this.redisClient.multi();
+        await this.redisClient.zrem(RETRY_QUEUE, jobId);
+        await this.redisClient.lpush(JOB_QUEUE, jobId);
+        // await multi.exec();
     }
 
     async markNextRetry(jobId: string, delayMs: number): Promise<number>{

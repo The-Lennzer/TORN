@@ -23,7 +23,7 @@
 ```
 ## TORN(Task ORchestration eNgine)
 TORN is a... well, a task orchestration engine, that let's you add jobs to a queue and executes them for you.
- 
+
 You can use the workers to queue jobs into a redis set and the workers will recursively process them.<br> 
 *TORN will be pakaged as an SDK and will be deployed to use with npm in the future*<br><br>
 TORN MVP as of 14-06-2025 includes
@@ -50,9 +50,9 @@ On successfull completion of the job, the logger would print:
 
 TORN also supports 
 {( ONE SHOULD NOTE THAT THESE ARE BEING BUILT RIGHT NOW)}
-- retries with optional backoff
+- retries with optional backoff ✔
+- dead letter queue for failed jobs ✔
 - metrics logging for each jobs
-- dead letter queue for failed jobs
 - concurrency using p-queues
 
 These are currently being worked on and will be available for TORN-v1.0.0

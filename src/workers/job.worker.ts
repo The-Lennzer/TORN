@@ -76,7 +76,7 @@ class Worker{
             } else {
                 const retry = parseInt(jobMeta.retries || '0') + 1
                 jobMeta.retries = retry.toString();
-                const retryManager = new RetryManager();
+                const retryManager = new RetryManager(redis);
 
                 if (retry > MAX_RETRIES){
                     logger.info(`Job failed after ${retry} retries: ${jobId}`); //job has finished all retries and is moved to DLQ
