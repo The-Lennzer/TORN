@@ -1,4 +1,4 @@
-import redis from "../queue/redis";
+import { getRedisClient } from "../queue/redis";
 import logger from "../utils/logger";
 import ExecutorFactory from "../executors/executor.factory";
 import {
@@ -10,9 +10,11 @@ import {
     DEAD_LETTER_QUEUE
 } from "../lib/constants";
  import RetryManager from "../retry/retry.manager";
+import { get } from "http";
 
 class Worker{
     async processJob(): Promise<void> {
+        const redis = getRedisClient();
         try{
             const jobIdRequest = await redis.brpop(JOB_QUEUE, 5);
 

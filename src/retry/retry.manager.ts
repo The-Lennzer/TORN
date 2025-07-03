@@ -1,4 +1,5 @@
-import redis from "../queue/redis";
+// import { getRedisClient} from "../queue/redis";
+import Redis from "ioredis";
 import { 
     RETRY_QUEUE,
     JOB_QUEUE
@@ -9,7 +10,7 @@ import {
 // requeue
 // setter
 class RetryManager {
-    constructor(private redisClient: any){}
+    constructor(private redisClient: Redis){}
     async scheduler(jobId: string, retryAt: number): Promise<void>{
         await this.redisClient.zadd(RETRY_QUEUE, retryAt, jobId);
     }
@@ -24,10 +25,10 @@ class RetryManager {
     }
 
     async requeueRetries(jobId: string): Promise<void> {
-        // const multi = this.redisClient.multi();
+        const multi = this.redisClient.multi();
         await this.redisClient.zrem(RETRY_QUEUE, jobId);
         await this.redisClient.lpush(JOB_QUEUE, jobId);
-        // await multi.exec();
+        await multi.exec();
     }
 
     async markNextRetry(jobId: string, delayMs: number): Promise<number>{
