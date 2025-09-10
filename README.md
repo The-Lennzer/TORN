@@ -49,11 +49,11 @@ On successfull completion of the job, the logger would print:
 </pre>
 
 TORN also supports 
-{( ONE SHOULD NOTE THAT THESE ARE BEING BUILT RIGHT NOW)}
 - retries with optional backoff ✔
 - dead letter queue for failed jobs ✔
-- metrics logging for each jobs
-- concurrency using p-queues
+- metrics logging for each jobs ✔
+- concurrency using p-queues ✔
 
 These are currently being worked on and will be available for TORN-v1.0.0
+
 
